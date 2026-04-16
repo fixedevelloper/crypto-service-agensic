@@ -1,0 +1,121 @@
+<?php
+
+
+namespace App\Http\Controllers;
+
+use App\Http\Helpers\Helpers;
+use App\Http\Services\NowPaymentsService;
+use App\Models\Payment;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Exception;
+use Illuminate\Support\Str;
+
+class PaymentController extends Controller
+{
+    protected $nowPayments;
+
+    public function __construct(NowPaymentsService $nowPayments)
+    {
+        $this->nowPayments = $nowPayments;
+    }
+
+    /**
+     * Initie un nouveau dépôt (Achat de crypto)
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function deposit(Request $request)
+    {
+        logger($request->all());
+
+        // 1. Validation dynamique
+        $validator = Validator::make($request->all(), [
+            'amount'            => 'required|numeric|min:1',
+            'currency'          => 'required|string|size:3', // ex: XAF, XOF, USD, NGN
+            'recipient_address' => 'required|string',
+            'network'           => 'required|string', // trc20, erc20, etc.
+            'crypto'            => 'required|string',  // usdt, trx, etc.
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+
+        try {
+            $userId = $request->header('X-User-Id');
+            $currency = strtoupper($request->currency);
+            $payCurrency = strtolower($request->crypto . $request->network);
+
+            // 2. Validation de l'adresse (Regex par réseau)
+            $this->validateCryptoAddress($request->network, $request->recipient_address);
+
+            // 3. Référence Unique
+            $reference = 'PAY-' . strtoupper(Str::random(10));
+
+            // 4. Appel au Service avec conversion automatique
+            $paymentData = $this->nowPayments->createPayment(
+                $request->amount,
+                $currency,    // Dynamique : XAF, XOF...
+                $payCurrency, // Dynamique : usdttrc20...
+                $reference
+            );
+         /*   if (!$paymentData['status']){
+                return Helpers::error($paymentData['message']);
+            }*/
+
+            // 5. Enregistrement
+            $payment = Payment::create([
+                'user_id'           => $userId,
+                'reference'         => $reference,
+                'provider_id'       => $paymentData['payment_id'] ?? null,
+                'fiat_amount'        => $request->amount, // On peut renommer la colonne en 'amount_fiat'
+                'crypto_currency'   => $payCurrency,
+                'fiat_currency'   => $currency,
+                'crypto_amount'     => $paymentData['pay_amount'] ?? null,
+                'pay_address'       => $paymentData['pay_address'] ?? null,
+                'recipient_address' => $request->recipient_address,
+                'status'            => $paymentData['payment_status'] ?? 'waiting',
+                'provider_response' => $paymentData,
+            ]);
+
+            return response()->json(['success' => true, 'data' => $payment], 201);
+
+        } catch (Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Validation basique des adresses par réseau
+     */
+    private function validateCryptoAddress($network, $address)
+    {
+        $patterns = [
+            'trc20' => '/^T[A-Za-z1-9]{33}$/',         // Tron (Commence par T)
+            'erc20' => '/^0x[a-fA-F0-9]{40}$/',       // Ethereum (Commence par 0x)
+            'bep20' => '/^0x[a-fA-F0-9]{40}$/',       // Binance Smart Chain
+        ];
+
+        $net = strtolower($network);
+        if (isset($patterns[$net]) && !preg_match($patterns[$net], $address)) {
+            throw new Exception("L'adresse fournie est invalide pour le réseau " . strtoupper($network));
+        }
+    }
+
+    /**
+     * Vérifie le statut actuel d'un paiement (pour le polling Android)
+     */
+    public function checkStatus($reference)
+    {
+        $payment = Payment::where('reference', $reference)->firstOrFail();
+
+        return response()->json([
+            'reference' => $payment->reference,
+            'status'    => $payment->status, // waiting, confirming, finished, etc.
+            'is_success' => $payment->isSuccess(),
+        ]);
+    }
+}
