@@ -25,9 +25,12 @@ Route::post('/validate-address', [ValidationController::class, 'validate']);
 // 🔥 STEP 3 - EXECUTE TRANSFER
 Route::post('/transfers', [TransferController::class, 'transfer']);
 Route::get('/transfers', [TransferController::class, 'userTransactions']);
+Route::get('/transactions', [TransferController::class, 'index']);
+Route::get('/transactions/{id}', [TransferController::class, 'show']);
 // Créer un dépôt
 Route::post('/payments/deposit', [PaymentController::class, 'deposit']);
-
+Route::get('/payments', [PaymentController::class, 'index']);
+Route::get('/payments/{id}', [PaymentController::class, 'show']);
 // Vérifier le statut (polling)
 Route::get('/payments/status/{reference}', [PaymentController::class, 'checkStatus']);
 

@@ -9,52 +9,57 @@ use Illuminate\Support\Facades\Log;
 
 class NowPaymentsIpnController extends Controller
 {
+
     public function __invoke(Request $request)
     {
         $ipnSecret = config('services.nowpayments.ipn_secret');
         $receivedSignature = $request->header('x-nowpayments-sig');
 
-        // 1. Récupérer les données brutes et les trier (requis pour la signature)
+        // 1. Récupération et tri des données
         $payload = $request->all();
+        if (empty($payload)) {
+            return response()->json(['message' => 'Empty payload'], 400);
+        }
+
         ksort($payload);
+
+        // IMPORTANT: NOWPayments attend un JSON sans espaces après les virgules/deux-points
         $jsonPayload = json_encode($payload, JSON_UNESCAPED_SLASHES);
 
-        // 2. Calculer la signature locale (Hmac SHA512)
+        // 2. Calcul et comparaison sécurisée
         $calculatedSignature = hash_hmac('sha512', $jsonPayload, $ipnSecret);
 
-        // 3. Comparaison sécurisée
-        if ($receivedSignature !== $calculatedSignature) {
-            Log::warning("IPN Signature invalide !", ['received' => $receivedSignature]);
+        if (!$receivedSignature || !hash_equals($calculatedSignature, $receivedSignature)) {
+            Log::error("IPN Signature invalide !", [
+                'expected' => $calculatedSignature,
+                'received' => $receivedSignature
+            ]);
             return response()->json(['message' => 'Invalid signature'], 400);
         }
 
-        // 4. Traitement selon le statut
-        $paymentStatus = $request->payment_status;
-        $orderId = $request->order_id;
+        // 3. Traitement atomique
+        return DB::transaction(function () use ($request) {
+            $transaction = Transaction::where('reference', $request->order_id)
+                ->lockForUpdate() // Évite les conditions de concurrence
+                ->first();
 
-        $transaction = Transaction::where('reference', $orderId)->first();
+            if (!$transaction) {
+                return response()->json(['message' => 'Transaction not found'], 404);
+            }
 
-        if (!$transaction) {
-            return response()->json(['message' => 'Transaction not found'], 404);
-        }
+            switch ($request->payment_status) {
+                case 'finished':
+                    $this->processSuccess($transaction);
+                    break;
+                case 'failed':
+                case 'expired':
+                    if ($transaction->status === 'pending') {
+                        $transaction->update(['status' => 'failed']);
+                    }
+                    break;
+            }
 
-        switch ($paymentStatus) {
-            case 'finished':
-                $this->processSuccess($transaction);
-                break;
-            case 'failed':
-            case 'expired':
-                $transaction->update(['status' => 'failed']);
-                break;
-        }
-
-        return response()->json(['status' => 'ok']);
-    }
-
-    private function processSuccess($transaction) {
-        if ($transaction->status !== 'success') {
-            $transaction->update(['status' => 'success', 'processed_at' => now()]);
-            // Déclencher ici ton service de Payout ou l'envoi de mail
-        }
+            return response()->json(['status' => 'ok']);
+        });
     }
 }

@@ -4,6 +4,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Helpers\Helpers;
+use App\Http\Resources\PaymentResource;
+use App\Http\Services\microService\UserServiceClient;
 use App\Http\Services\NowPaymentsService;
 use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
@@ -15,12 +17,63 @@ use Illuminate\Support\Str;
 class PaymentController extends Controller
 {
     protected $nowPayments;
+    protected $userService;
 
-    public function __construct(NowPaymentsService $nowPayments)
+    public function __construct(NowPaymentsService $nowPayments,UserServiceClient $userServiceClient)
     {
         $this->nowPayments = $nowPayments;
+        $this->userService=$userServiceClient;
     }
 
+
+
+    public function index(Request $request)
+    {
+        // 1. Récupérer les paiements normalement
+        $payments = Payment::latest()->paginate(15);
+
+        // 2. Extraire tous les IDs utilisateurs uniques de la page actuelle
+        $userIds = $payments->pluck('user_id')->unique()->toArray();
+
+        // 3. Appeler le Microservice User (via HTTP ou gRPC)
+        // On récupère une liste d'utilisateurs indexée par leur ID
+        $usersFromServer = $this->userService->getUsersByIds($userIds);
+
+        // 4. Injecter les données dans chaque modèle de la collection
+        $payments->getCollection()->transform(function ($payment) use ($usersFromServer) {
+            $payment->user_data = $usersFromServer[$payment->user_id] ?? null;
+            return $payment;
+        });
+
+        return Helpers::success(PaymentResource::collection($payments));
+    }
+
+
+    public function show($id)
+    {
+        // 1. Récupérer le paiement dans la BDD locale
+        $payment = Payment::find($id);
+
+        if (!$payment) {
+            return Helpers::error("Paiement introuvable", 404);
+        }
+
+        try {
+            // 2. Appel au microservice User pour récupérer le profil complet
+            // On suppose que vous avez un service 'UserServiceClient'
+            $userData = $this->userService->getUserById($payment->user_id);
+
+            // 3. Injecter dynamiquement la donnée dans le modèle avant de le passer à la Resource
+            $payment->user_data = $userData;
+
+        } catch (\Exception $e) {
+            // En cas d'échec du microservice User, on laisse user_data à null
+            // La Resource gérera le fallback (le mode dégradé)
+            Log::error("Impossible de joindre le service User: " . $e->getMessage());
+        }
+
+        return Helpers::success(new PaymentResource($payment));
+    }
     /**
      * Initie un nouveau dépôt (Achat de crypto)
      * @param Request $request
