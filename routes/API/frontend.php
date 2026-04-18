@@ -3,6 +3,7 @@
 use App\Http\Controllers\BeneficiaryController;
 use App\Http\Controllers\NowPaymentsIpnController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\Webhook\NowPaymentsGatewayController;
 use App\Http\Controllers\WebhookController;
 use App\Models\CryptoCurrency;
 use Illuminate\Support\Facades\Route;
@@ -35,7 +36,7 @@ Route::get('/payments/{id}', [PaymentController::class, 'show']);
 Route::get('/payments/status/{reference}', [PaymentController::class, 'checkStatus']);
 
 // 🔥 WEBHOOK BLOCKCHAIN
-Route::post('/webhook/blockchain', [WebhookController::class, 'handle'])->name('nowpayments.ipn');
-Route::post('/nowpayments/ipn', NowPaymentsIpnController::class)->name('nowpayments.payement.ipn');
+//Route::post('/webhook/blockchain', [WebhookController::class, 'handle'])->name('nowpayments.ipn');
+Route::post('/webhook/blockchain', NowPaymentsGatewayController::class)->name('nowpayments.payement.ipn');
 Route::resource('beneficiaries', BeneficiaryController::class);
 Route::get('/cryptos', [QuoteController::class, 'getCurrencyCrypto']);

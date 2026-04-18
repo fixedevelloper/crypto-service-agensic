@@ -42,4 +42,9 @@ return [
         'password' => env('NOWPAYMENTS_PASSWORD'),
     ],
 
+    'user_service'=>[
+        'url' => env('USER_SERVICE_URL'),
+        'token' => env('API_SERVICE_TOKEN'),
+    ]
+
 ];

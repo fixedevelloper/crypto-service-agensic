@@ -113,7 +113,7 @@ class NowPaymentsService
             'price_currency' => 'usd', // Devise pivot
             'pay_currency' => $payCurrency,
             'order_id' => $orderId,
-            'ipn_callback_url' => route('nowpayments.ipn')
+            'ipn_callback_url' => route('nowpayments.payement.ipn')
         ])->json();
     }
 

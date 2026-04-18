@@ -3,8 +3,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use App\Models\Transaction;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class NowPaymentsIpnController extends Controller
@@ -39,8 +41,8 @@ class NowPaymentsIpnController extends Controller
 
         // 3. Traitement atomique
         return DB::transaction(function () use ($request) {
-            $transaction = Transaction::where('reference', $request->order_id)
-                ->lockForUpdate() // Évite les conditions de concurrence
+            $transaction = Payment::where('reference', $request->order_id)
+                ->lockForUpdate()
                 ->first();
 
             if (!$transaction) {
@@ -61,5 +63,39 @@ class NowPaymentsIpnController extends Controller
 
             return response()->json(['status' => 'ok']);
         });
+    }
+    private function processSuccess($transaction)
+    {
+        // 1. Vérification de sécurité pour éviter les doubles traitements
+        if ($transaction->status === 'success') {
+            return;
+        }
+
+        try {
+            DB::transaction(function () use ($transaction) {
+                // 2. Mise à jour du statut de la transaction
+                $transaction->update([
+                    'status' => 'success',
+                    'processed_at' => now()
+                ]);
+
+                // 3. Action métier (Exemple : Créditer le compte de l'utilisateur)
+                $user = $transaction->user;
+                $user->increment('balance', $transaction->amount);
+
+                // 4. (Optionnel) Enregistrement dans un historique de solde
+                // BalanceHistory::create([...]);
+
+                Log::info("Paiement validé et traité pour la transaction: " . $transaction->reference);
+            });
+
+            // 5. Actions hors transaction (Emails, Notifications Push)
+            // On le fait après le commit DB pour éviter d'envoyer un mail si la DB crash
+            // Mail::to($transaction->user)->send(new PaymentReceived($transaction));
+
+        } catch (\Exception $e) {
+            Log::error("Erreur lors du traitement processSuccess: " . $e->getMessage());
+            // Optionnel : Alerter l'admin que le paiement est reçu mais le service non rendu
+        }
     }
 }
