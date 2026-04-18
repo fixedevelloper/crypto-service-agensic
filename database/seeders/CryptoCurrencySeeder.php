@@ -11,33 +11,94 @@ class CryptoCurrencySeeder extends Seeder
     public function run(): void
     {
         $cryptos = [
+            // --- TETHER (USDT) ---
             [
                 'name' => 'Tether USD',
-                'code' => 'usdt', // En minuscule pour l'API
-                'network' => 'trc20', // TRON -> trc20
+                'code' => 'usdt',
+                'network' => 'trc20',
                 'icon' => 'https://cryptologos.cc/logos/tether-usdt-logo.png',
                 'icon_res' => 'usdt_tron'
             ],
             [
                 'name' => 'Tether USD',
                 'code' => 'usdt',
-                'network' => 'erc20', // ERC20 -> erc20
+                'network' => 'erc20',
                 'icon' => 'https://cryptologos.cc/logos/tether-usdt-logo.png',
                 'icon_res' => 'usdt_eth'
             ],
             [
+                'name' => 'Tether USD',
+                'code' => 'usdt',
+                'network' => 'bep20', // Binance Smart Chain
+                'icon' => 'https://cryptologos.cc/logos/tether-usdt-logo.png',
+                'icon_res' => 'usdt_bsc'
+            ],
+
+            // --- USD COIN (USDC) ---
+            [
+                'name' => 'USD Coin',
+                'code' => 'usdc',
+                'network' => 'erc20',
+                'icon' => 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
+                'icon_res' => 'usdc_eth'
+            ],
+            [
+                'name' => 'USD Coin',
+                'code' => 'usdc',
+                'network' => 'trc20',
+                'icon' => 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
+                'icon_res' => 'usdc_tron'
+            ],
+            [
+                'name' => 'USD Coin',
+                'code' => 'usdc',
+                'network' => 'matic', // Polygon
+                'icon' => 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
+                'icon_res' => 'usdc_polygon'
+            ],
+
+            // --- MAJEURES ---
+            [
                 'name' => 'Bitcoin',
                 'code' => 'btc',
-                'network' => '', // Le BTC n'a pas de suffixe réseau chez NOWPayments
+                'network' => '',
                 'icon' => 'https://cryptologos.cc/logos/bitcoin-btc-logo.png',
                 'icon_res' => 'btc'
             ],
             [
-                'name' => 'BNB',
-                'code' => 'bnb',
-                'network' => 'bsc', // BSC -> bsc
-                'icon' => 'https://cryptologos.cc/logos/bnb-bnb-logo.png',
-                'icon_res' => 'bnb'
+                'name' => 'Ethereum',
+                'code' => 'eth',
+                'network' => 'eth',
+                'icon' => 'https://cryptologos.cc/logos/ethereum-eth-logo.png',
+                'icon_res' => 'eth'
+            ],
+            [
+                'name' => 'Solana',
+                'code' => 'sol',
+                'network' => 'sol',
+                'icon' => 'https://cryptologos.cc/logos/solana-sol-logo.png',
+                'icon_res' => 'sol'
+            ],
+            [
+                'name' => 'Litecoin',
+                'code' => 'ltc',
+                'network' => '',
+                'icon' => 'https://cryptologos.cc/logos/litecoin-ltc-logo.png',
+                'icon_res' => 'ltc'
+            ],
+            [
+                'name' => 'Tron',
+                'code' => 'trx',
+                'network' => 'trx',
+                'icon' => 'https://cryptologos.cc/logos/tron-trx-logo.png',
+                'icon_res' => 'trx'
+            ],
+            [
+                'name' => 'Dogecoin',
+                'code' => 'doge',
+                'network' => '',
+                'icon' => 'https://cryptologos.cc/logos/dogecoin-doge-logo.png',
+                'icon_res' => 'doge'
             ],
         ];
 

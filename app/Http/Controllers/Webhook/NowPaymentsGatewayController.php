@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Webhook;
 
 use App\Jobs\RetryCreditUserJob;
 use App\Models\Payment;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -64,9 +65,30 @@ class NowPaymentsGatewayController extends BaseNowPaymentsIpnController
 
     private function handlePayout(Request $request)
     {
-        // Logique pour les transferts sortants
-        $payoutId = $request->payout_id;
-        // ... ta logique de mise à jour de virement
+
+        return DB::transaction(function () use ($request) {
+            $transaction = Transaction::where('reference', $request->payout_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$transaction) {
+                return response()->json(['message' => 'Transaction not found'], 404);
+            }
+
+            switch ($request->status) {
+                case 'FINISHED':
+                    $this->processSuccess($transaction);
+                    break;
+                case 'FAILED':
+                case 'EXPIRED':
+                    if ($transaction->status === 'pending') {
+                        $transaction->update(['status' => 'failed']);
+                    }
+                    break;
+            }
+
+            return response()->json(['status' => 'ok']);
+        });
         return response()->json(['status' => 'payout_processed']);
     }
 
