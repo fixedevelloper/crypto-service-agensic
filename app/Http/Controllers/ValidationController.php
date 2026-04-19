@@ -26,8 +26,8 @@ public function validate(Request $request)
 
     $isValid = $this->validator->validate(
         $request->crypto,
-        $request->network,
-        $request->address
+        $request->address,
+        $request->network
     );
 
     return Helpers::success([

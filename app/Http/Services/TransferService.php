@@ -51,43 +51,37 @@ class TransferService
         });
 
         try {
-            // 3. Appel au service Blockchain (Sortie de fonds)
-            // Note: On ne met PAS cet appel dans DB::transaction pour éviter les locks longs
-        /*    $result = $this->blockchain->send(
-                $quote->crypto,
-                $quote->network,
-                $address,
-                $quote->total_crypto
-            );*/
+            // 3. Appel au service Blockchain
             $result = $this->nowPaymentsService->payout(
                 $address,
                 $quote->total_crypto,
                 $quote->network === 'TRON' ? 'USDTTRC20' : $quote->crypto
             );
 
+            logger("Réponse Payout brute :", $result);
+
+            // Extraction du premier retrait (withdrawal)
+            $withdrawal = $result['withdrawals'][0] ?? null;
+
+            if (!$withdrawal) {
+                throw new Exception("Aucun retrait trouvé dans la réponse du fournisseur.");
+            }
+
+            // 4. Mise à jour de la transaction
+            // Note : Le hash est NULL au début, on stocke l'ID du retrait en attendant l'IPN
             $transaction->update([
-                'tx_hash' => $result['payouts'][0]['id'] ?? null,
-                'status' => 'processing',
-                'provider_response' => $result
-            ]);
-            logger($result);
-            // 4. Mise à jour du succès
-            $transaction->update([
-                'tx_hash' => $result['tx_hash'],
-                'status' => 'success',
-                'provider_response' => json_encode($result['raw']),
+                'tx_hash' => $withdrawal['hash'] ?? null, // Sera NULL au début
+                'provider_id' => $withdrawal['id'], // ID du retrait NOWPayments (ex: 5006250540)
+                'status' => 'processing', // On reste en processing car le hash n'est pas encore généré
+                'provider_response' => json_encode($result),
                 'processed_at' => now()
             ]);
 
-            $this->log($transaction->id, 'success', 'Transaction envoyée avec succès', $result);
+            $this->log($transaction->id, 'processing', 'Payout initié (Status: CREATING)', $result);
 
         } catch (Exception $e) {
-            // 5. Gestion critique des erreurs
             $transaction->update(['status' => 'failed']);
-
             $this->log($transaction->id, 'failed', $e->getMessage());
-
-            // On relance l'exception pour que le Controller puisse l'afficher à l'utilisateur
             throw new Exception("Le transfert a échoué : " . $e->getMessage());
         }
 
@@ -104,7 +98,7 @@ class TransferService
             throw new Exception("Ce devis a déjà été utilisé pour une transaction.");
         }
 
-        if (!$this->validator->validate($quote->crypto, $quote->network, $address)) {
+        if (!$this->validator->validate($quote->crypto,$address ,$quote->network )) {
             throw new Exception("L'adresse de destination est invalide pour ce réseau.");
         }
     }

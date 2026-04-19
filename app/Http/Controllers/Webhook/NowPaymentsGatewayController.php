@@ -77,7 +77,7 @@ class NowPaymentsGatewayController extends BaseNowPaymentsIpnController
 
             switch ($request->status) {
                 case 'FINISHED':
-                    $this->processSuccess($transaction);
+                    $this->processPayoutSuccess($transaction);
                     break;
                 case 'FAILED':
                 case 'EXPIRED':
@@ -105,6 +105,41 @@ class NowPaymentsGatewayController extends BaseNowPaymentsIpnController
                 ->post(config('services.user_service.url') . '/users-credit', [
                     'user_id'   => $transaction->user_id,
                     'amount'    => $transaction->fiat_amount,
+                    'reference' => $transaction->reference, // Crucial !
+                ]);
+
+            if ($response->successful()) {
+                // 2. Succès : On met à jour localement
+                $transaction->update([
+                    'status' => 'success',
+                    'processed_at' => now()
+                ]);
+            } else {
+                throw new \Exception("Le microservice User a renvoyé une erreur: " . $response->status());
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Échec crédit synchrone : " . $e->getMessage());
+
+            // 3. Gestion d'échec : On marque comme 'pending_credit' et on lance un Job de secours
+            $transaction->update(['status' => 'pending_credit']);
+
+            // Ce Job réessaiera toutes les X minutes avec un "exponential backoff"
+            RetryCreditUserJob::dispatch($transaction);
+        }
+    }
+    private function processPayoutSuccess($transaction)
+    {
+        if ($transaction->status === 'success') return;
+
+        try {
+            // 1. Appel au microservice User
+            // On envoie la 'reference' pour que le service User puisse vérifier l'idempotence
+            $response = Http::withToken(config('services.user_service.token'))
+                ->timeout(5) // On ne bloque pas le thread IPN trop longtemps
+                ->post(config('services.user_service.url') . '/users-debit', [
+                    'user_id'   => $transaction->user_id,
+                    'amount'    => $transaction->amount_xaf,
                     'reference' => $transaction->reference, // Crucial !
                 ]);
 

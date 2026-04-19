@@ -4,43 +4,75 @@
 namespace App\Http\Services;
 
 
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
 class AddressValidatorService
 {
+    private $apiKey;
+    private $baseUrl = 'https://api.nowpayments.io/v1/payout/validate-address';
+
+    public function __construct()
+    {
+        $this->apiKey = config('services.nowpayments.api_key');
+    }
+
     /**
-     * Valide une adresse crypto selon le réseau.
-     * * @param string $crypto ex: BTC, USDT, ETH
-     * @param string $network ex: BTC, TRON, ERC20
+     * Valide une adresse via l'API NOWPayments
+     * @param string $currency
      * @param string $address
+     * @param string|null $network
+     * @param string|null $extraId
      * @return bool
      */
-    public function validate($crypto, $network, $address)
+    public function validate(string $currency, string $address, ?string $network = null, ?string $extraId = null): bool
     {
-        $crypto = strtoupper($crypto);
-        $network = strtoupper($network);
+        // 1. On nettoie et on met en minuscule
+        $currency = strtolower($currency);
+        $network = $network ? strtolower($network) : '';
 
-        // Si le network est "DEFAULT", on lui assigne le réseau natif
-        if ($network === 'DEFAULT') {
-            $network = match ($crypto) {
-            'ETH'   => 'ERC20',
-            'USDT'  => 'TRON', // ou ERC20 selon ton business
-            'BTC'   => 'BTC',
-            default => $network
+        // 2. Mapping de correction pour les réseaux
+        // NOWPayments attend 'usdttrc20' et non 'usdt trc20' ou 'usdt default'
+        $formattedCurrency = $currency;
+
+        if ($currency === 'usdt' || $currency === 'usdc') {
+            $formattedCurrency = match ($network) {
+            'trc20', 'tron' => $currency . 'trc20',
+            'erc20', 'eth'  => $currency . 'erc20',
+            'bsc', 'bep20'  => $currency . 'bep20',
+            'matic', 'polygon' => $currency . 'polygon',
+            default => $currency . 'trc20', // On définit un vrai défaut technique
         };
     }
 
-        $key = "$crypto-$network";
 
-        return match ($key) {
-        'USDT-TRON' =>
-            (bool) preg_match('/^T[1-9A-HJ-NP-Za-km-z]{33}$/', $address),
+        try {
+            $response = Http::withHeaders([
+                'x-api-key' => $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->post($this->baseUrl, [
+                'address'  => $address,
+                'currency' => $formattedCurrency,
+                'extra_id' => $extraId,
+            ]);
 
-        'BTC-BTC' =>
-            (bool) preg_match('/^(1|3)[1-9A-HJ-NP-Za-km-z]{25,34}$|^(bc1)[a-z0-9]{39,59}$/i', $address),
+            logger("Contenu brut reçu : " . $response->body());
 
-        'ETH-ERC20' =>
-            (bool) preg_match('/^0x[a-fA-F0-9]{40}$/', $address),
+            if ($response->successful()) {
+                // Validation si la réponse est exactement "OK" (ignorant la casse et espaces)
+                return trim(strtoupper($response->body())) === 'OK';
+            }
 
-        default => false
-    };
-}
+            Log::error("Erreur API Validation Adresse", [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error("Exception lors de la validation : " . $e->getMessage());
+            return false;
+        }
+    }
 }

@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Log;
 class UserServiceClient
 {
 
-    // app/Services/UserServiceClient.php
 
     public function getUsersByIds(array $ids)
     {
@@ -43,5 +42,73 @@ class UserServiceClient
 
             return $response->successful() ? $response->json('data') : null;
         });
+    }
+    public function credit($transaction)
+    {
+        // Si la transaction a déjà été validée entre-temps, on arrête.
+        if ($transaction->status === 'success') {
+            return;
+        }
+
+        $response = Http::withToken(config('services.user_service.token'))
+            ->post(config('services.user_service.url') . '/users-credit', [
+                'user_id'   => $transaction->user_id,
+                'amount'    => $transaction->fiat_amount,
+                'reference' => $transaction->reference,
+            ]);
+
+        if ($response->successful()) {
+            $transaction->update([
+                'status' => 'success',
+                'processed_at' => now()
+            ]);
+
+            Log::info("Crédit réussi via  pour : " . $transaction->reference);
+        } else {
+            // Si le code est 4xx (erreur client), inutile de retenter 10 fois
+            if ($response->clientError()) {
+                Log::error("Erreur critique (4xx) sur le service User : " . $response->body());
+                $this->fail(new \Exception("Erreur client non récupérable"));
+                return;
+            }
+
+            // Pour les 5xx ou erreurs réseau, le Job sera automatiquement
+            // remis en file d'attente grâce au throw
+            throw new \Exception("Microservice User indisponible, nouvelle tentative...");
+        }
+    }
+    public function debit($transaction)
+    {
+        // Si la transaction a déjà été validée entre-temps, on arrête.
+        if ($transaction->status === 'success') {
+            return;
+        }
+
+        $response = Http::withToken(config('services.user_service.token'))
+            ->post(config('services.user_service.url') . '/users-debit', [
+                'user_id'   => $transaction->user_id,
+                'amount'    => $transaction->fiat_amount,
+                'reference' => $transaction->reference,
+            ]);
+
+        if ($response->successful()) {
+            $transaction->update([
+                'status' => 'success',
+                'processed_at' => now()
+            ]);
+
+            Log::info("Crédit réussi via  pour : " . $transaction->reference);
+        } else {
+            // Si le code est 4xx (erreur client), inutile de retenter 10 fois
+            if ($response->clientError()) {
+                Log::error("Erreur critique (4xx) sur le service User : " . $response->body());
+                $this->fail(new \Exception("Erreur client non récupérable"));
+                return;
+            }
+
+            // Pour les 5xx ou erreurs réseau, le Job sera automatiquement
+            // remis en file d'attente grâce au throw
+            throw new \Exception("Microservice User indisponible, nouvelle tentative...");
+        }
     }
 }

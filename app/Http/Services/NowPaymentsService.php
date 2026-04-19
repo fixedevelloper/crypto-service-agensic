@@ -146,7 +146,7 @@ class NowPaymentsService
                         'address' => $address,
                         'currency' => $currency, // USDTTRC20
                         'amount' => $amount,
-                        'ipn_callback_url' => route('nowpayments.ipn')
+                        'ipn_callback_url' => route('nowpayments.payement.ipn')
                     ]
                 ]
             ])
