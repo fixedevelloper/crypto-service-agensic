@@ -49,7 +49,7 @@ class CryptoCurrencySeeder extends Seeder
                 'icon' => 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
                 'icon_res' => 'usdc_tron'
             ],
-            [
+            
 [
     'name' => 'USD Coin',
     'code' => 'usdc',
