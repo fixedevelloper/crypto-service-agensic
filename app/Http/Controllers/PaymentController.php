@@ -69,7 +69,7 @@ class PaymentController extends Controller
         } catch (\Exception $e) {
             // En cas d'échec du microservice User, on laisse user_data à null
             // La Resource gérera le fallback (le mode dégradé)
-            Log::error("Impossible de joindre le service User: " . $e->getMessage());
+           // Log::error("Impossible de joindre le service User: " . $e->getMessage());
         }
 
         return Helpers::success(new PaymentResource($payment));
