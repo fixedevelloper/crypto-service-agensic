@@ -50,6 +50,13 @@ class CryptoCurrencySeeder extends Seeder
                 'icon_res' => 'usdc_tron'
             ],
             [
+    'name' => 'USD Coin',
+    'code' => 'usdc',
+    'network' => 'bep20', // Modification du réseau
+    'icon' => 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
+    'icon_res' => 'usdc_bep20' // Modification de la ressource icône pour coller au réseau
+],
+            [
                 'name' => 'USD Coin',
                 'code' => 'usdc',
                 'network' => 'matic', // Polygon
