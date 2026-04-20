@@ -34,16 +34,34 @@ class AddressValidatorService
         // 2. Mapping de correction pour les réseaux
         // NOWPayments attend 'usdttrc20' et non 'usdt trc20' ou 'usdt default'
         $formattedCurrency = $currency;
+// On s'assure que tout est en minuscule pour un matching parfait
+$currency = strtolower($currency);
+$network = strtolower($network);
 
-        if ($currency === 'usdt' || $currency === 'usdc') {
-            $formattedCurrency = match ($network) {
-            'trc20', 'tron' => $currency . 'trc20',
-            'erc20', 'eth'  => $currency . 'erc20',
-            'bsc', 'bep20'  => $currency . 'bep20',
-            'matic', 'polygon' => $currency . 'polygon',
-            default => $currency . 'trc20', // On définit un vrai défaut technique
-        };
-    }
+if ($currency === 'usdt' || $currency === 'usdc') {
+    $formattedCurrency = match ($network) {
+        'trc20', 'tron'            => $currency . 'trc20',
+        'erc20', 'eth', 'ethereum' => $currency . 'erc20',
+        'bsc', 'bep20'             => $currency . 'bsc', // ou 'usdcbep20' selon votre API
+        'polygon', 'matic', 'pol'  => $currency . 'polygon',
+        'solana', 'sol'            => $currency . 'sol',
+        
+        // Défaut sécurisé : on force le TRC20 (souvent le moins cher pour l'USDT)
+        // ou on lance une exception si on veut être strict
+        default => $currency . 'trc20', 
+    };
+} else {
+    // Pour BTC, ETH, SOL, POL qui n'ont généralement pas besoin de suffixe réseau
+    // ou qui ont un mapping simple.
+    $formattedCurrency = match ($currency) {
+        'btc'    => 'btc',
+        'eth'    => ($network === 'bsc' || $network === 'bep20') ? 'ethbsc' : 'eth',
+        'sol'    => 'sol',
+        'matic', 'pol' => 'maticpoly',
+        'bnb'    => 'bnb',
+        default  => $currency,
+    };
+}
 
 
         try {
