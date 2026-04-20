@@ -108,6 +108,13 @@ class CryptoCurrencySeeder extends Seeder
                 'icon' => 'https://cryptologos.cc/logos/dogecoin-doge-logo.png',
                 'icon_res' => 'doge'
             ],
+            [
+    'name' => 'Polygon',
+    'code' => 'pol',
+    'network' => 'polygon',
+    'icon' => 'https://cryptologos.cc/logos/polygon-matic-logo.png',
+    'icon_res' => 'pol_matic'
+],
         ];
 
         foreach ($cryptos as $crypto) {

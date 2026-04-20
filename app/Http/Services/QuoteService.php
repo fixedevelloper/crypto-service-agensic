@@ -86,19 +86,39 @@ class QuoteService
     | CRYPTO MAPPING
     |--------------------------------------------------------------------------
     */
-    private function mapCurrency($crypto, $network)
-    {
-        $crypto = strtoupper(trim($crypto));
-        $network = strtoupper(trim($network));
+  private function mapCurrency($crypto, $network)
+{
+    $crypto = strtoupper(trim($crypto));
+    $network = strtoupper(trim($network));
 
-        return match ("$crypto-$network") {
+    return match ("$crypto-$network") {
+        // --- USDT ---
+        'USDT-TRON'    => 'usdttrc20',
+        'USDT-ERC20'   => 'usdterc20',
+        'USDT-BSC'     => 'usdtbep20',
+        'USDT-BEP20'   => 'usdtbep20', // Alias fréquent
 
-        'USDT-TRON' => 'usdttrc20',
-        'USDT-ERC20' => 'usdterc20',
-        'BTC-BTC' => 'btc',
-        'ETH-ERC20' => 'eth',
+        // --- USDC ---
+        'USDC-ERC20'   => 'usdcerc20',
+        'USDC-BSC'     => 'usdcbep20',
+        'USDC-BEP20'   => 'usdcbep20',
+        'USDC-POLYGON' => 'usdcpoly',
+        'USDC-SOLANA'  => 'usdcsol',
 
-        default => throw new \Exception("Crypto non supportée: $crypto-$network")
+        // --- BTC & ETH ---
+        'BTC-BTC'      => 'btc',
+        'ETH-ERC20'    => 'eth',
+        'ETH-BSC'      => 'ethbep20',
+
+        // --- NATIVES & ALTCOINS ---
+        'BNB-BSC'      => 'bnbbep20',
+        'BNB-BEP20'    => 'bnbbep20',
+        'SOL-SOLANA'   => 'sol',
+        'POL-POLYGON'  => 'pol', 
+        'MATIC-POLYGON'=> 'maticpoly', // Pour assurer la rétro-compatibilité
+
+        default => throw new \Exception("Crypto ou réseau non supporté: $crypto sur le réseau $network")
     };
+
 }
 }
