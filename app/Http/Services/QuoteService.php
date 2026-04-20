@@ -27,6 +27,7 @@ class QuoteService
             'xaf',
             strtolower($currencyTo)
         );
+        logger($estimate);
 
         if (!isset($estimate['estimated_amount'])) {
             throw new \Exception('Erreur estimation NOWPayments');
@@ -94,25 +95,26 @@ class QuoteService
     return match ("$crypto-$network") {
         // --- USDT ---
         'USDT-TRON'    => 'usdttrc20',
+        'USDT-TRC20'    => 'usdttrc20',
         'USDT-ERC20'   => 'usdterc20',
-        'USDT-BSC'     => 'usdtbep20',
-        'USDT-BEP20'   => 'usdtbep20', // Alias fréquent
+        'USDT-BSC'     => 'usdtbsc',
+        'USDT-BEP20'   => 'usdtbsc', // Alias fréquent
 
         // --- USDC ---
-        'USDC-ERC20'   => 'usdcerc20',
-        'USDC-BSC'     => 'usdcbep20',
-        'USDC-BEP20'   => 'usdcbep20',
+        'USDC-ERC20'   => 'usdceth',
+        'USDC-BSC'     => 'usdcbsc',
+        'USDC-BEP20'   => 'usdcbsc',
         'USDC-POLYGON' => 'usdcpoly',
         'USDC-SOLANA'  => 'usdcsol',
 
         // --- BTC & ETH ---
         'BTC-BTC'      => 'btc',
         'ETH-ERC20'    => 'eth',
-        'ETH-BSC'      => 'ethbep20',
+        'ETH-BSC'      => 'ethbsc',
 
         // --- NATIVES & ALTCOINS ---
-        'BNB-BSC'      => 'bnbbep20',
-        'BNB-BEP20'    => 'bnbbep20',
+        'BNB-BSC'      => 'bnbbsc',
+        'BNB-BEP20'    => 'bnbbsc',
         'SOL-SOLANA'   => 'sol',
         'POL-POLYGON'  => 'pol', 
         'MATIC-POLYGON'=> 'maticpoly', // Pour assurer la rétro-compatibilité
