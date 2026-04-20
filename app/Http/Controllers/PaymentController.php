@@ -115,9 +115,12 @@ class PaymentController extends Controller
                 $payCurrency, // Dynamique : usdttrc20...
                 $reference
             );
-            if ($paymentData['payment_status']=='failed'){
-                return Helpers::error($paymentData['message']);
-            }
+            logger($paymentData);
+/*            if (!($paymentData['status'] ?? false)) {
+    return Helpers::error(
+        $paymentData['message'] ?? 'Erreur de paiement'
+    );
+} */
 
             // 5. Enregistrement
             $payment = Payment::create([
