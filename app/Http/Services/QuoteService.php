@@ -30,7 +30,7 @@ class QuoteService
         logger($estimate);
 
         if (!isset($estimate['estimated_amount'])) {
-            throw new \Exception('Erreur estimation NOWPayments');
+            throw new \Exception('Erreur estimation');
         }
 
         $amountCrypto = (float) $estimate['estimated_amount'];
