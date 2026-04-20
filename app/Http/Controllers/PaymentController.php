@@ -87,7 +87,7 @@ class PaymentController extends Controller
         $validator = Validator::make($request->all(), [
             'amount'            => 'required|numeric|min:1',
             'currency'          => 'required|string|size:3', // ex: XAF, XOF, USD, NGN
-            'recipient_address' => 'required|string',
+            //'recipient_address' => 'required|string',
             'network'           => 'required|string', // trc20, erc20, etc.
             'crypto'            => 'required|string',  // usdt, trx, etc.
         ]);
@@ -103,7 +103,7 @@ class PaymentController extends Controller
             $payCurrency = strtolower($request->crypto . $request->network);
 
             // 2. Validation de l'adresse (Regex par réseau)
-            $this->validateCryptoAddress($request->network, $request->recipient_address);
+           // $this->validateCryptoAddress($request->network, $request->recipient_address);
 
             // 3. Référence Unique
             $reference = 'PAY-' . strtoupper(Str::random(10));
@@ -115,9 +115,9 @@ class PaymentController extends Controller
                 $payCurrency, // Dynamique : usdttrc20...
                 $reference
             );
-         /*   if (!$paymentData['status']){
+            if ($paymentData['payment_status']=='failed'){
                 return Helpers::error($paymentData['message']);
-            }*/
+            }
 
             // 5. Enregistrement
             $payment = Payment::create([
@@ -129,7 +129,7 @@ class PaymentController extends Controller
                 'fiat_currency'   => $currency,
                 'crypto_amount'     => $paymentData['pay_amount'] ?? null,
                 'pay_address'       => $paymentData['pay_address'] ?? null,
-                'recipient_address' => $request->recipient_address,
+                'recipient_address' => $paymentData['pay_address'] ?? null,
                 'status'            => $paymentData['payment_status'] ?? 'waiting',
                 'provider_response' => $paymentData,
             ]);

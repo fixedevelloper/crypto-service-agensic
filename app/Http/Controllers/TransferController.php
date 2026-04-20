@@ -120,7 +120,7 @@ class TransferController extends Controller
 
         return response()->json([
             'status' => true,
-            'data' => $transactions
+            'data' => TransactionResource::collection($transactions)
         ]);
     }
 
