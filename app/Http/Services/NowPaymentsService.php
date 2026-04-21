@@ -73,6 +73,40 @@ class NowPaymentsService
             ->json();
     }
 
+public function getBalance($currency, $network)
+{
+    // 1. On harmonise la clé pour correspondre à l'API (ex: usdcbsc)
+    $searchKey = strtolower(trim($currency . $network));
+
+    $response = Http::withHeaders($this->headers())
+        ->get("{$this->baseUrl}/balance");
+
+    if ($response->successful()) {
+        $data = $response->json();
+        logger($data);
+        // 2. Dans ta réponse, les clés sont à la racine (pas de data['balances'])
+        if (isset($data[$searchKey])) {
+            return [
+                'status' => true,
+                'amount' => $data[$searchKey]['amount'],
+                // Note : l'API renvoie 'pendingAmount' et non 'pending'
+                'pending' => $data[$searchKey]['pendingAmount'] ?? 0,
+            ];
+        }
+
+        return [
+            'status' => false,
+            'message' => "La devise $searchKey n'est pas disponible. Trouvées : " . implode(', ', array_keys($data)),
+            'amount' => 0
+        ];
+    }
+
+    return [
+        'status' => false,
+        'message' => "Erreur API NOWPayments",
+        'amount' => 0
+    ];
+}
     /*
     |--------------------------------------------------------------------------
     | ESTIMATE (QUOTE 🔥)
@@ -105,6 +139,7 @@ class NowPaymentsService
     */
     public function createPayment($amount, $currency, $payCurrency, $orderId)
     {
+        logger($currency);
         // On convertit tout en USD pour NOWPayments
         $amountInUsd = $this->convertToUsd($amount, strtoupper($currency));
 
@@ -139,12 +174,16 @@ class NowPaymentsService
     */
     public function payout($address, $amount, $currency)
     {
+         logger($currency);
+          logger($amount);
+           logger($address);
         return Http::withHeaders($this->headers())
             ->post("{$this->baseUrl}/payout", [
+                "ipn_callback_url"=>  route('nowpayments.payement.ipn'),
                 'withdrawals' => [
                     [
                         'address' => $address,
-                        'currency' => $currency, // USDTTRC20
+                        'currency' => $currency,
                         'amount' => $amount,
                         'ipn_callback_url' => route('nowpayments.payement.ipn')
                     ]

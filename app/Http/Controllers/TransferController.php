@@ -124,25 +124,55 @@ class TransferController extends Controller
         ]);
     }
 
-    public function transfer(Request $request)
-    {
-        $request->validate([
+public function transfer(Request $request)
+{
+    try {
+        // 1. Validation des entrées
+        $validated = $request->validate([
             'quote_id' => 'required|integer',
-            'address' => 'required|string'
+            'address'  => 'required|string'
         ]);
 
+        // 2. Récupération de l'ID utilisateur (vérifie qu'il existe)
         $userId = $request->header('X-User-Id');
+        if (!$userId) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Identifiant utilisateur manquant dans les en-têtes (X-User-Id).'
+            ], 401);
+        }
 
+    
+        // 3. Exécution du transfert via le service
         $transaction = $this->transferService->execute(
             $userId,
             $request->quote_id,
             $request->address
         );
 
-        return response()->json([
-            'status' => true,
-            'data' => $transaction
+        return Helpers::success(new TransactionResource($transaction));
+
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        // Erreur si les champs envoyés par le mobile sont incorrects
+        return Helpers::error('Données invalides');
+        
+
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        // Erreur si le quote_id n'existe pas dans la base de données
+
+          return Helpers::error('La cotation (Quote) demandée est introuvable ou a expiré.');
+
+    } catch (\Exception $e) {
+        // Capture toutes les autres erreurs (Solde insuffisant, API crypto hors ligne, etc.)
+        // On log l'erreur pour le développeur
+        \Log::error("Erreur de transfert : " . $e->getMessage(), [
+            'userId' => $request->header('X-User-Id'),
+            'quote_id' => $request->quote_id
         ]);
+
+
+         return Helpers::error($e->getMessage());
     }
+}
 
 }

@@ -46,36 +46,56 @@ class CheckTransfertStatus extends Command
     }
 
     private function processPayment($paymentId)
-    {
-        $this->line("Vérification du paiement : $paymentId");
+{
+    $this->line("Vérification du paiement : $paymentId");
 
-        try {
-            $response = Http::withHeaders([
-                'x-api-key' => config('services.nowpayments.api_key'),
-            ])->get("https://api.nowpayments.io/v1/payout/$paymentId");
+    try {
+        $response = Http::withHeaders([
+            'x-api-key' => config('services.nowpayments.api_key'),
+        ])->get("https://api.nowpayments.io/v1/payout/$paymentId");
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $status = $data['payment_status'];
+        if ($response->successful()) {
+            $data = $response->json();
+            
+            // ATTENTION : Le statut global du payout peut être différent 
+            // de celui du retrait individuel. On cible le premier retrait du tableau.
+            if (isset($data['withdrawals'][0])) {
+                $withdrawal = $data['withdrawals'][0];
+                $status = $withdrawal['status']; // FINISHED, SENDING, etc.
+                $hash = $withdrawal['hash'] ?? null;
 
-                $this->updateTransaction($paymentId, $data);
-                $this->info("Statut actuel : $status");
+                // Mise à jour de ta transaction avec le statut interne
+                $this->updateTransaction($paymentId, [
+                    'status' => $status,
+                    'hash' => $hash,
+                    'fee' => $withdrawal['fee'] ?? 0,
+                    'raw_data' => $data // Optionnel : pour garder une trace complète
+                ]);
+
+                $this->info("Statut du retrait : $status");
+                
+                if ($status === 'FINISHED') {
+                    $this->info("Transaction confirmée sur la blockchain ! Hash: $hash");
+                }
             } else {
-                $this->error("Erreur API pour $paymentId : " . $response->status());
+                $this->error("Aucun retrait trouvé dans ce Payout ID.");
             }
-        } catch (\Exception $e) {
-            $this->error("Erreur : " . $e->getMessage());
+        } else {
+            $this->error("Erreur API pour $paymentId : " . $response->status());
         }
+    } catch (\Exception $e) {
+        $this->error("Erreur : " . $e->getMessage());
     }
-
+}
     private function updateTransaction($paymentId, $data)
     {
+        logger($paymentId);
         $transaction = Transaction::where('provider_id', $paymentId)->first();
 
         if (!$transaction) return;
 
         // Si le paiement est fini, on déclenche la logique de succès
-        if ($data['payment_status'] === 'finished' && $transaction->status !== 'success') {
+        if ($data['status'] === strtoupper('finished') && $transaction->status !== 'success') {
             $transaction->update([
                 'status' => 'success',
                 'tx_hash' => $data['hash'] ?? $transaction->tx_hash,
@@ -87,8 +107,10 @@ class CheckTransfertStatus extends Command
 
             $this->info("Transaction $paymentId marquée comme SUCCESS");
         }
-        elseif (in_array($data['payment_status'], ['failed', 'expired'])) {
-            $transaction->update(['status' => 'failed']);
+        elseif (in_array($data['status'], [strtoupper('failed'), strtoupper('expired'),'REJECTED'])) {
+          $transaction->status = 'failed';
+            $success = $transaction->save();
+            logger("Résultat de la sauvegarde : " . ($success ? "OUI" : "NON"));
             $this->warn("Transaction $paymentId marquée comme FAILED");
         }
     }

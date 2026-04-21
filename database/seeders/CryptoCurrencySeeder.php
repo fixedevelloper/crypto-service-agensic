@@ -11,7 +11,7 @@ class CryptoCurrencySeeder extends Seeder
     public function run(): void
     {
         $cryptos = [
-            // --- TETHER (USDT) ---
+    
             [
                 'name' => 'Tether USD',
                 'code' => 'usdt',

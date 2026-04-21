@@ -116,11 +116,12 @@ class PaymentController extends Controller
                 $reference
             );
             logger($paymentData);
-/*            if (!($paymentData['status'] ?? false)) {
+
+if (isset($paymentData['status']) && $paymentData['status'] === false) {
     return Helpers::error(
-        $paymentData['message'] ?? 'Erreur de paiement'
+        $paymentData['message'] ?? 'Erreur de montant minimal ou de configuration'
     );
-} */
+}
 
             // 5. Enregistrement
             $payment = Payment::create([
@@ -132,7 +133,7 @@ class PaymentController extends Controller
                 'fiat_currency'   => $currency,
                 'crypto_amount'     => $paymentData['pay_amount'] ?? null,
                 'pay_address'       => $paymentData['pay_address'] ?? null,
-                'recipient_address' => $paymentData['pay_address'] ?? null,
+                'recipient_address' => $paymentData['pay_address'] ?? '-',
                 'status'            => $paymentData['payment_status'] ?? 'waiting',
                 'provider_response' => $paymentData,
             ]);

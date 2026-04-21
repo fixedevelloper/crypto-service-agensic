@@ -18,8 +18,7 @@ class TransferService
     public function __construct(
         AddressValidatorService $validator,
         NowPaymentsService $nowPaymentsService
-    )
-    {
+    ) {
         $this->validator = $validator;
         $this->nowPaymentsService = $nowPaymentsService;
     }
@@ -27,10 +26,24 @@ class TransferService
     public function execute($userId, $quoteId, $address)
     {
         $quote = Quote::findOrFail($quoteId);
-
+     
         // 1. Validations métier avant toute action SQL
         $this->validatePreConditions($quote, $address);
+        // 1. On vérifie le solde disponible pour l'USDT (par exemple)
+        $balanceInfo = $this->nowPaymentsService->getBalance($quote->crypto , $quote->network);
 
+        logger($balanceInfo);
+        if (!$balanceInfo['status'] || $balanceInfo['amount'] < $quote->amount_crypto) {
+            throw new Exception("Solde insuffisant sur le compte marchand (Disponible: {$balanceInfo['amount']})");
+        }
+
+        // 2. TRÈS IMPORTANT : Vérifier aussi le gaz (ex: TRX ou BNB)
+/*         $gasCurrency = ($quote->network === 'trc20') ? 'trx' : 'bsc';
+        $gasBalance = $this->nowPaymentsService->getBalance($gasCurrency,);
+
+        if ($gasBalance['amount'] <= 0) {
+            throw new Exception("Alerte technique: Pas de Gaz ($gasCurrency) pour payer les frais de réseau.");
+        } */
         // 2. Création de la transaction en base de données
         // On utilise une transaction DB pour s'assurer que l'enregistrement est bien créé
         $transaction = DB::transaction(function () use ($userId, $quote, $address) {
@@ -55,7 +68,7 @@ class TransferService
             $result = $this->nowPaymentsService->payout(
                 $address,
                 $quote->total_crypto,
-                $quote->network === 'TRON' ? 'USDTTRC20' : $quote->crypto
+                $quote->crypto.$quote->network
             );
 
             logger("Réponse Payout brute :", $result);
@@ -98,7 +111,7 @@ class TransferService
             throw new Exception("Ce devis a déjà été utilisé pour une transaction.");
         }
 
-        if (!$this->validator->validate($quote->crypto,$address ,$quote->network )) {
+        if (!$this->validator->validate($quote->crypto, $address, $quote->network)) {
             throw new Exception("L'adresse de destination est invalide pour ce réseau.");
         }
     }
